@@ -21,9 +21,11 @@ import com.carrotsearch.randomizedtesting.RandomizedContext;
 import com.carrotsearch.randomizedtesting.annotations.Repeat;
 import com.spatial4j.core.context.jts.JtsSpatialContext;
 import com.spatial4j.core.context.jts.JtsSpatialContextFactory;
+import com.spatial4j.core.distance.DistanceUtils;
 import com.spatial4j.core.io.jts.JtsWktShapeParser;
 import com.spatial4j.core.shape.impl.PointImpl;
 import com.spatial4j.core.shape.jts.JtsGeometry;
+import com.spatial4j.core.shape.jts.JtsPoint;
 import com.vividsolutions.jts.geom.Coordinate;
 import com.vividsolutions.jts.geom.CoordinateFilter;
 import com.vividsolutions.jts.geom.Geometry;
@@ -47,6 +49,22 @@ import static com.spatial4j.core.shape.SpatialRelation.INTERSECTS;
 public class JtsGeometryTest extends AbstractTestShapes {
 
   private final String POLY_STR = "Polygon((-10 30, -40 40, -10 -20, 40 20, 0 0, -10 30))";
+  private final String POLY_WITH_HOLE = "POLYGON ((-87.9127 41.7161, -87.9382 41.7441, -87.959 41.7743, -87.9745 41.8062,   " +
+          "-87.9845 41.8392, -87.989 41.873, -87.9878 41.9069, -87.9808 41.9404, -87.9683 41.973, -87.9505 42.0042, -87.9274 42.0335, " +
+          "-87.8997 42.0603, -87.8676 42.0844, -87.8317 42.1053, -87.7925 42.1226, -87.7507 42.1361, -87.707 42.1456, -87.662 42.1509, " +
+          "-87.6164 42.152, -87.571 42.1488, -87.5266 42.1414, -87.4837 42.1298, -87.4431 42.1144, -87.4055 42.0952, -87.3715 42.0727, " +
+          "-87.3415 42.0472, -87.316 42.0191, -87.2955 41.9888, -87.2803 41.9569, -87.2706 41.9237, -87.2665 41.89, -87.2681 41.8561, " +
+          "-87.2754 41.8226, -87.2882 41.79, -87.3064 41.759, -87.3296 41.7298, -87.3574 41.7031, -87.3895 41.6792, -87.4254 41.6585,  " +
+          "-87.4643 41.6413, -87.5059 41.6278, -87.5493 41.6184, -87.5939 41.6131, -87.6391 41.6121, -87.6841 41.6153, -87.7282 41.6226, " +
+          "-87.7708 41.6341, -87.8111 41.6494, -87.8486 41.6684, -87.8826 41.6908, -87.9127 41.7161), (-87.8479 41.6691, -87.8105 41.6502, "
+          + "-87.7703 41.6349, -87.7279 41.6235, -87.6839 41.6161, -87.6391 41.613, -87.594 41.614, -87.5495 41.6193, " +
+          "-87.5063 41.6287, -87.4649 41.6421, -87.426 41.6592, -87.3903 41.6799, -87.3583 41.7037, -87.3306 41.7303, " +
+          "-87.3074 41.7594, -87.2894 41.7904, -87.2766 41.8228, -87.2693 41.8561, -87.2677 41.8899, -87.2718 41.9236, -87.2815 41.9566, " +
+          "-87.2967 41.9885, -87.3171 42.0187, -87.3424 42.0467, -87.3723 42.0721, -87.4063 42.0945, -87.4438 42.1136, -87.4842 42.129, " +
+          "-87.5269 42.1405, -87.5712 42.1479, -87.6164 42.1511, -87.6618 42.15, -87.7067 42.1447, -87.7503 42.1353, -87.792 42.1218, " +
+          "-87.831 42.1045, -87.8668 42.0837, -87.8988 42.0597, -87.9264 42.033, -87.9494 42.0038, -87.9672 41.9727, -87.9797 41.9402,  " +
+          "-87.9866 41.9068, -87.9878 41.873, -87.9834 41.8394, -87.9733 41.8064, -87.9578 41.7747, -87.9372 41.7446, -87.9117 41.7167,  " +
+          "-87.8818 41.6914, -87.8479 41.6691))";
   private JtsGeometry POLY_SHAPE;
   private final int DL_SHIFT = 180;//since POLY_SHAPE contains 0 0, I know a shift of 180 will make it cross the DL.
   private JtsGeometry POLY_SHAPE_DL;//POLY_SHAPE shifted by DL_SHIFT to cross the dateline
@@ -93,6 +111,9 @@ public class JtsGeometryTest extends AbstractTestShapes {
     JtsGeometry polyI = (JtsGeometry) ctx.readShapeFromWkt("POLYGON((10 0, 20 0, 15 5, 10 0))");
     //within base: differs from base by one point is within
     JtsGeometry polyW = (JtsGeometry) ctx.readShapeFromWkt("POLYGON((0 0, 9 0, 5 5, 0 0))");
+    // disjoint: poly inside hole of larger poly
+    JtsGeometry polyH = (JtsGeometry) ctx.readShapeFromWkt(POLY_WITH_HOLE);
+    JtsGeometry polyD = (JtsGeometry) ctx.readShapeFromWkt("POLYGON((-87.6544 41.9677, -87.6544 41.9717, -87.6489 41.9717, -87.6389 41.9677, -87.6544 41.9677))");
     //a boundary point of base
     Point pointB = ctx.makePoint(0, 0);
     //a shared boundary line of base
@@ -104,6 +125,7 @@ public class JtsGeometryTest extends AbstractTestShapes {
     assertRelation(CONTAINS, base, base);//preferred result as there is no EQUALS
     assertRelation(INTERSECTS, base, polyI);
     assertRelation(CONTAINS, base, polyW);
+    assertRelation(DISJOINT, polyH, polyD);
     assertRelation(CONTAINS, base, pointB);
     assertRelation(CONTAINS, base, lineB);
     assertRelation(INTERSECTS, base, lineI);
@@ -185,6 +207,19 @@ public class JtsGeometryTest extends AbstractTestShapes {
 
       assertRelation(null, expectedSR, POLY_SHAPE_DL, shape2);
     }
+  }
+
+  @Test
+  public void testPointNormalization() throws ParseException {
+    JtsSpatialContextFactory factory = new JtsSpatialContextFactory();
+    Point p = new JtsPoint((factory.getGeometryFactory().createPoint(new Coordinate(-115, -275, Double
+            .NaN))), ctx);
+    DistanceUtils.normPoint(p);
+  }
+
+  @Test
+  public void testDatelineCross() throws ParseException {
+    Shape geom = ctx.readShapeFromWkt( "Polygon((176 30, 178 40, -174 30, -176 20, 176 30))");
   }
 
   @Test

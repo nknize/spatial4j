@@ -60,6 +60,7 @@ public class SpatialContext {
   private final boolean geo;
   private final DistanceCalculator calculator;
   private final Rectangle worldBounds;
+  private final Orientation orientation;
 
   private final WktShapeParser wktShapeParser;
   private final BinaryCodec binaryCodec;
@@ -74,23 +75,25 @@ public class SpatialContext {
    * @param worldBounds Optional; defaults to GEO_WORLDBOUNDS or MAX_WORLDBOUNDS depending on units.
    */
   @Deprecated
-  public SpatialContext(boolean geo, DistanceCalculator calculator, Rectangle worldBounds) {
-    this(initFromLegacyConstructor(geo, calculator, worldBounds));
+  public SpatialContext(boolean geo, DistanceCalculator calculator, Rectangle worldBounds, Orientation orientation) {
+    this(initFromLegacyConstructor(geo, calculator, worldBounds, orientation));
   }
 
   private static SpatialContextFactory initFromLegacyConstructor(boolean geo,
                                                                  DistanceCalculator calculator,
-                                                                 Rectangle worldBounds) {
+                                                                 Rectangle worldBounds,
+                                                                 Orientation orientation) {
     SpatialContextFactory factory = new SpatialContextFactory();
     factory.geo = geo;
     factory.distCalc = calculator;
     factory.worldBounds = worldBounds;
+    factory.orientation = orientation;
     return factory;
   }
 
   @Deprecated
   public SpatialContext(boolean geo) {
-    this(initFromLegacyConstructor(geo, null, null));
+    this(initFromLegacyConstructor(geo, null, null, null));
   }
 
   /**
@@ -125,6 +128,7 @@ public class SpatialContext {
       this.worldBounds = new RectangleImpl(bounds, this);
     }
 
+    this.orientation = (factory.orientation == null) ? Orientation.RIGHT : factory.orientation;
     this.normWrapLongitude = factory.normWrapLongitude && this.isGeo();
     this.wktShapeParser = factory.makeWktShapeParser(this);
     this.binaryCodec = factory.makeBinaryCodec(this);
@@ -152,6 +156,8 @@ public class SpatialContext {
     return worldBounds;
   }
 
+  public Orientation getOrientation() { return orientation; }
+
   /** If true then {@link #normX(double)} will wrap longitudes outside of the standard
    * geodetic boundary into it. Example: 181 will become -179. */
   public boolean isNormWrapLongitude() {
@@ -176,6 +182,10 @@ public class SpatialContext {
   /** Normalize the 'y' dimension. Might reduce precision or wrap it to be within the bounds. This
    * is called by {@link com.spatial4j.core.io.WktShapeParser} before creating a shape. */
   public double normY(double y) { return y; }
+
+  public Point normalizePoint(Point p) {
+    return DistanceUtils.normPoint(p);
+  }
 
   /** Ensure fits in {@link #getWorldBounds()}. It's called by any shape factory method that
    * gets an 'x' dimension. */
@@ -343,4 +353,13 @@ public class SpatialContext {
     }
   }
 
+  public static enum Orientation {
+    LEFT,
+    RIGHT;
+
+    public static final Orientation CLOCKWISE = Orientation.LEFT;
+    public static final Orientation COUNTER_CLOCKWISE = Orientation.RIGHT;
+    public static final Orientation CW = Orientation.LEFT;
+    public static final Orientation CCW = Orientation.RIGHT;
+  }
 }

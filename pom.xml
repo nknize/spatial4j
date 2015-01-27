@@ -137,6 +137,22 @@
       <scope>test</scope>
     </dependency>
 
+    <dependency>
+      <groupId>com.googlecode.efficient-java-matrix-library</groupId>
+      <artifactId>core</artifactId>
+      <version>0.27</version>
+      <scope>compile</scope>
+      <optional>true</optional>
+    </dependency>
+
+    <dependency>
+      <groupId>com.googlecode.efficient-java-matrix-library</groupId>
+      <artifactId>dense64</artifactId>
+      <version>0.27</version>
+      <scope>compile</scope>
+      <optional>true</optional>
+    </dependency>
+
   </dependencies>
   
   <build>

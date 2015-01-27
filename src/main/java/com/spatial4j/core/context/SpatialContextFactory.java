@@ -17,6 +17,7 @@
 
 package com.spatial4j.core.context;
 
+import com.spatial4j.core.context.SpatialContext.Orientation;
 import com.spatial4j.core.distance.CartesianDistCalc;
 import com.spatial4j.core.distance.DistanceCalculator;
 import com.spatial4j.core.distance.GeodesicSphereDistCalc;
@@ -67,6 +68,7 @@ public class SpatialContextFactory {
   public boolean geo = true;
   public DistanceCalculator distCalc;//defaults in SpatialContext c'tor based on geo
   public Rectangle worldBounds;//defaults in SpatialContext c'tor based on geo
+  public Orientation orientation;
 
   public boolean normWrapLongitude = false;
   

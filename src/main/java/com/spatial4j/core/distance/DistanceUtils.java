@@ -237,6 +237,46 @@ public class DistanceUtils {
     return (off <= 180 ? off : 360-off) - 90;
   }
 
+
+  /**
+   * If latitude is normalized from -90 < lat || lat > 90, to -90 <= lat <= 90
+   * then longitude needs to be normalized to its antipodal point, <code>normPoint</code>
+   * should be used in place of <code>normLonDEG</code> and <code>normLatDEG</code> to
+   * keep the lat/lon pairs consistent.
+   *
+   * @param pt
+   * @return
+   */
+  public static Point normPoint(Point pt) {
+    double lat = pt.getY();
+    double lon = pt.getX();
+    boolean normalized = false;
+
+    if (lat>90.0 || lat<-90.0) {
+      normalized = true;
+      // handle world wrapping and shift result 90 degrees
+      double off = ((lat % 360.0 + 360.0) % lat) + 90.0; // correct mod operator for negative numbers
+      // antipodal shift of longitude needed for lat results > 180 degrees
+      if (off > 180.0) {
+        // re-normalize the latitude and antipodal shift longitude
+        lat = (360.0 - off) - 90.0;
+        lon += 180.0;
+      } else {
+       lat = off - 90.0;
+      }
+    }
+
+    if (lon > 180.0  || lon <= -180.0) {
+      if (!normalized) normalized = true;
+      lon = normLonDEG(lon);
+    }
+
+    if (normalized) {
+      pt.reset(lon, lat);
+    }
+    return pt;
+  }
+
   /**
    * Calculates the bounding box of a circle, as specified by its center point
    * and distance.  <code>reuse</code> is an optional argument to store the
