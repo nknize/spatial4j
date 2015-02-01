@@ -58,6 +58,63 @@ public class TestDistances extends RandomizedTest {
   }
 
   @Test
+  public void testDistancesAgainstVincenty() {
+    DistanceCalculator vincenty = new GeodesicSphereDistCalc.Vincenty();
+    DistanceCalculator haversine = new GeodesicSphereDistCalc.Haversine();
+    DistanceCalculator lawOfCos = new GeodesicSphereDistCalc.LawOfCosines();
+
+    final int TRIES = 100000 * (int)multiplier();
+    for (int i = 0; i < TRIES; i++) {
+      Point p1 = randomGeoPoint();
+      Point p2 = randomGeoPointFrom(p1);
+      double distV = vincenty.distance(p1, p2);
+
+      //Haversine: accurate to a centimeter if on same side of globe,
+      // otherwise possibly 1m apart (antipodal)
+      double havV = haversine.distance(p1, p2);
+      assertEquals(distV, havV, (distV <= 90) ? DistanceUtils.KM_TO_DEG * 0.00001 : DistanceUtils.KM_TO_DEG * 0.001);
+      //  Fractionally compared to truth, also favorably accurate.
+      if (distV != 0 && distV > 0.0000001)
+        assertEquals(1.0, havV/distV, 0.001);//0.1%
+
+      //LawOfCosines: accurate to within 1 meter (or better?)
+      double locV = lawOfCos.distance(p1, p2);
+      assertEquals(distV, locV, DistanceUtils.KM_TO_DEG * 0.001);
+    }
+  }
+
+  private Point randomGeoPoint() {
+    //not uniformly distributed but that's ok
+    return ctx.makePoint(randomDouble()*360 + -180, randomDouble()*180 + -90);
+  }
+
+  private Point randomGeoPointFrom(Point p1) {
+    int which = randomInt(10);//inclusive
+    double distDEG;
+    if (which <= 2) {
+      distDEG = 180 - randomDouble() * 0.001 / Math.pow(10, which);
+    } else if (which >= 8) {
+      distDEG = randomDouble() * 0.001 / Math.pow(10, 10-which);
+    } else {
+      distDEG = randomDouble()*180;
+    }
+    double bearingDEG = randomDouble() * 360;
+    Point p2RAD = DistanceUtils.pointOnBearingRAD(DistanceUtils.toRadians(p1.getY()), DistanceUtils.toRadians(p1.getX()),
+            DistanceUtils.toRadians(distDEG), DistanceUtils.toRadians(bearingDEG), ctx, null);
+    p2RAD.reset(DistanceUtils.toDegrees(p2RAD.getX()), DistanceUtils.toDegrees(p2RAD.getY()));
+    return p2RAD;//now it's in degrees
+  }
+
+
+  @Test /** See #81 */
+  public void testHaversineNaN() {
+    assertEquals(180, new GeodesicSphereDistCalc.Haversine().distance(
+                    ctx.makePoint(-81.05206968336057, 71.82629271026536),
+                    98.9479297952497, -71.82629264390964),
+            0.00001);
+  }
+
+  @Test
   public void testCalcBoxByDistFromPt() {
     //first test regression
     {
@@ -195,7 +252,7 @@ public class TestDistances extends RandomizedTest {
   private void testDistCalcPointOnBearing(double distKm) {
     for(int angDEG = 0; angDEG < 360; angDEG += randomIntBetween(1,20)) {
       Point c = ctx.makePoint(
-              DistanceUtils.normLonDEG(randomInt(359)),
+              ctx.normX(randomInt(359), true),
               randomIntBetween(-90,90));
 
       //0 distance means same point
@@ -223,11 +280,11 @@ public class TestDistances extends RandomizedTest {
         {-90-180,90},{-90-360,-90},{90+180,-90},{90+360,90},
         {-12+180,12}};
     for (double[] pair : lats) {
-      assertEquals("input "+pair[0], pair[1], DistanceUtils.normLatDEG(pair[0]), 0);
+      assertEquals("input "+pair[0], pair[1], ctx.normY(pair[0], true), 0);
     }
 
     for(int i = -1000; i < 1000; i += randomInt(9)*10) {
-      double d = DistanceUtils.normLatDEG(i);
+      double d = ctx.normY(i, true);
       assertTrue(i + " " + d, d >= -90 && d <= 90);
     }
   }
@@ -240,11 +297,11 @@ public class TestDistances extends RandomizedTest {
         {-180-360,-180},{-180-720,-180},
         {180+360,+180},{180+720,+180}};
     for (double[] pair : lons) {
-      assertEquals("input " + pair[0], pair[1], DistanceUtils.normLonDEG(pair[0]), 0);
+      assertEquals("input " + pair[0], pair[1], ctx.normX(pair[0], true), 0);
     }
 
     for(int i = -1000; i < 1000; i += randomInt(9)*10) {
-      double d = DistanceUtils.normLonDEG(i);
+      double d = ctx.normX(i, true);
       assertTrue(i + " " + d, d >= -180 && d <= 180);
     }
   }

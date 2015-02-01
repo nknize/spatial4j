@@ -18,6 +18,7 @@
 package com.spatial4j.core.shape;
 
 import com.carrotsearch.randomizedtesting.annotations.ParametersFactory;
+import com.carrotsearch.randomizedtesting.annotations.Repeat;
 import com.spatial4j.core.context.SpatialContext;
 import com.spatial4j.core.context.SpatialContextFactory;
 import com.spatial4j.core.context.jts.JtsSpatialContextFactory;
@@ -39,12 +40,11 @@ public class TestShapesGeo extends AbstractTestShapes {
 
   @ParametersFactory
   public static Iterable<Object[]> parameters() {
-
-    //TODO ENABLE LawOfCosines WHEN WORKING
-    //DistanceCalculator distCalcL = new GeodesicSphereDistCalc.Haversine(units.earthRadius());//default
+    final DistanceCalculator distCalcL = new GeodesicSphereDistCalc.LawOfCosines();
     final DistanceCalculator distCalcH = new GeodesicSphereDistCalc.Haversine();//default
     final DistanceCalculator distCalcV = new GeodesicSphereDistCalc.Vincenty();
     return Arrays.asList($$(
+        $(new SpatialContextFactory(){{geo = true; distCalc = new RoundingDistCalc(distCalcL);}}.newSpatialContext()),
         $(new SpatialContextFactory(){{geo = true; distCalc = new RoundingDistCalc(distCalcH);}}.newSpatialContext()),
         $(new SpatialContextFactory(){{geo = true; distCalc = new RoundingDistCalc(distCalcV);}}.newSpatialContext()),
         $(new JtsSpatialContextFactory(){{geo = true; distCalc = new RoundingDistCalc(distCalcH);}}.newSpatialContext()))
@@ -63,7 +63,7 @@ public class TestShapesGeo extends AbstractTestShapes {
     return DistanceUtils.dist2Degrees(km, DistanceUtils.EARTH_MEAN_RADIUS_KM);
   }
 
-  @Test
+  @Test @Repeat(iterations = 1)
   public void testGeoRectangle() {
     double v = 200 * (randomBoolean() ? -1 : 1);
     try { ctx.makeRectangle(v,0,0,0); fail(); } catch (InvalidShapeException e) {}
@@ -102,6 +102,9 @@ public class TestShapesGeo extends AbstractTestShapes {
     //Test geo rectangle intersections
     testRectIntersect();
 
+    //Bug #85   ** NOT FIXED YET ** TODO
+    //assertRelation(WITHIN, ctx.makeRectangle(-180, -180, -10, 10), ctx.makeRectangle(180, 180, -30, 30));
+
     //Test buffer
     assertEquals(ctx.makeRectangle(-10, 10, -10, 10), ctx.makeRectangle(0, 0, 0, 0).getBuffered(10, ctx));
     int MAX_TRIES = scaledRandomIntBetween(100, 1000);
@@ -110,11 +113,12 @@ public class TestShapesGeo extends AbstractTestShapes {
       int buf = randomIntBetween(0, 90);
       Rectangle br = (Rectangle) r.getBuffered(buf, ctx);
       assertRelation(null, CONTAINS, br, r);
-      if (r.getWidth() + 2 * buf >= 360)
+      if (r.getWidth() + 2 * buf >= 360) {
         assertEquals(360, br.getWidth(), 0.0);
-      else
-        assertTrue(br.getWidth() - r.getWidth() >= 2 * buf);
-      //TODO test more thoroughly; we don't check that we over-buf
+      } else {
+        assertGreaterOrEqual(br.getWidth() - r.getWidth(), 2 * buf, EPS);
+        //TODO test more thoroughly; we don't check that we over-buf
+      }
     }
     assertTrue(ctx.makeRectangle(0, 10, 0, 89).getBuffered(0.5, ctx).getBoundingBox().getWidth()
         > 11);

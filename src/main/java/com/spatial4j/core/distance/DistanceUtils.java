@@ -155,7 +155,7 @@ public class DistanceUtils {
   }
 
   /**
-   * Given a start point (startLat, startLon) and a bearing on a sphere, return the destination point.
+   * Given a start point (startLat, startLon), distance, and a bearing on a sphere, return the destination point.
    *
    * @param startLat The starting point latitude, in radians
    * @param startLon The starting point longitude, in radians
@@ -214,7 +214,10 @@ public class DistanceUtils {
 
   /**
    * Puts in range -180 <= lon_deg <= +180.
+   * @deprecated
+   * use {@link com.spatial4j.core.crs.SphericalCRSDelegate#normalizeX} instead
    */
+  @Deprecated
   public static double normLonDEG(double lon_deg) {
     if (lon_deg >= -180 && lon_deg <= 180)
       return lon_deg;//common case, and avoids slight double precision shifting
@@ -229,7 +232,10 @@ public class DistanceUtils {
 
   /**
    * Puts in range -90 <= lat_deg <= 90.
+   * @deprecated
+   * use {@link com.spatial4j.core.crs.SphericalCRSDelegate#normalizeY} instead
    */
+  @Deprecated
   public static double normLatDEG(double lat_deg) {
     if (lat_deg >= -90 && lat_deg <= 90)
       return lat_deg;//common case, and avoids slight double precision shifting
@@ -259,8 +265,8 @@ public class DistanceUtils {
         //we have special logic for longitude
         minX = -180; maxX = 180;//world wrap: 360 deg
         if (maxY <= 90 && minY >= -90) {//doesn't pass either pole: 180 deg
-          minX = normLonDEG(lon - 90);
-          maxX = normLonDEG(lon + 90);
+          minX = ctx.normX(lon - 90, true);
+          maxX = ctx.normX(lon + 90, true);
         }
         if (maxY > 90)
           maxY = 90;
@@ -270,8 +276,8 @@ public class DistanceUtils {
         //--calc longitude bounds
         double lon_delta_deg = calcBoxByDistFromPt_deltaLonDEG(lat, lon, distDEG);
 
-        minX = normLonDEG(lon - lon_delta_deg);
-        maxX = normLonDEG(lon + lon_delta_deg);
+        minX = ctx.normX(lon - lon_delta_deg, true);
+        maxX = ctx.normX(lon + lon_delta_deg, true);
       }
     }
     if (reuse == null) {
@@ -406,6 +412,8 @@ public class DistanceUtils {
     double hsinY = Math.sin((lat1 - lat2) * 0.5);
     double h = hsinY * hsinY +
             (Math.cos(lat1) * Math.cos(lat2) * hsinX * hsinX);
+    if (h > 1)//numeric robustness issue. If we didn't check, the answer would be NaN!
+      h = 1;
     return 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   }
 
@@ -421,23 +429,16 @@ public class DistanceUtils {
    * The arguments and return value are in radians.
    */
   public static double distLawOfCosinesRAD(double lat1, double lon1, double lat2, double lon2) {
-    //TODO validate formula
-
-    //(MIGRATED FROM org.apache.lucene.spatial.geometry.LatLng.arcDistance()) (Lucene 3x)
-    // Imported from mq java client.  Variable references changed to match.
-
     // Check for same position
     if (lat1 == lat2 && lon1 == lon2)
       return 0.0;
 
-    // Get the m_dLongitude difference. Don't need to worry about
-    // crossing 180 since cos(x) = cos(-x)
+    // Get the longitude difference. Don't need to worry about
+    // crossing dateline since cos(x) = cos(-x)
     double dLon = lon2 - lon1;
 
-    double a = DEG_90_AS_RADS - lat1;
-    double c = DEG_90_AS_RADS - lat2;
-    double cosB = (Math.cos(a) * Math.cos(c))
-        + (Math.sin(a) * Math.sin(c) * Math.cos(dLon));
+    double cosB = (Math.sin(lat1) * Math.sin(lat2))
+            + (Math.cos(lat1) * Math.cos(lat2) * Math.cos(dLon));
 
     // Find angle subtended (with some bounds checking) in radians
     if (cosB < -1.0)

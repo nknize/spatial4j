@@ -23,6 +23,7 @@ import com.spatial4j.core.shape.Point;
 import com.spatial4j.core.shape.Rectangle;
 import com.spatial4j.core.shape.Shape;
 import com.spatial4j.core.shape.SpatialRelation;
+import com.spatial4j.core.crs.SphericalCRSDelegate;
 
 /**
  * A simple Rectangle implementation that also supports a longitudinal
@@ -81,15 +82,15 @@ public class RectangleImpl implements Rectangle {
       } else {
         //doesn't touch pole
         double latDistance = distance;
-        double closestToPoleY = (maxY - minY > 0) ? maxY : minY;
+        double closestToPoleY = Math.abs(maxY) > Math.abs(minY) ? maxY : minY;
         double lonDistance = DistanceUtils.calcBoxByDistFromPt_deltaLonDEG(
             closestToPoleY, minX, distance);//lat,lon order
         //could still wrap the world though...
         if (lonDistance * 2 + getWidth() >= 360)
           return ctx.makeRectangle(-180, 180, minY - latDistance, maxY + latDistance);
         return ctx.makeRectangle(
-            DistanceUtils.normLonDEG(minX - lonDistance),
-            DistanceUtils.normLonDEG(maxX + lonDistance),
+            ctx.normX(minX - lonDistance, true),
+            ctx.normX(maxX + lonDistance, true),
             minY - latDistance, maxY + latDistance);
       }
     } else {
@@ -287,7 +288,7 @@ public class RectangleImpl implements Rectangle {
     final double y = getHeight() / 2 + minY;
     double x = getWidth() / 2 + minX;
     if (minX > maxX)//WGS84
-      x = DistanceUtils.normLonDEG(x);//in case falls outside the standard range
+      x = ctx.normX(x, true);//in case falls outside the standard range
     return new PointImpl(x, y, ctx);
   }
 
